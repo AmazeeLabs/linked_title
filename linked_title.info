@@ -1,0 +1,5 @@
+name = Linked Title
+description = Extends title formatter to use a custom link provided by a link field
+core = 7.x
+
+dependencies[] = title

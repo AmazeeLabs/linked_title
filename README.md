@@ -1,4 +1,5 @@
-linked_title
+Linked title
 ============
 
-Link entity title using a link field
+Provides a entity title formatter that allows linking to a url provided by a
+link field.

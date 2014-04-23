@@ -1,0 +1,139 @@
+<?php
+/**
+ * @file
+ *   Linked title field module
+ */
+
+
+/**
+ * Implements hook_field_formatter_info().
+ */
+function linked_title_field_formatter_info() {
+  return array(
+    'linked_title_wrap' => array(
+      'label' => t('Linked and wrapped title (link field support)'),
+      'field types' => array('text'),
+      'settings' => array('title_style' => '', 'title_link' => '', 'title_class' => ''),
+    ),
+  );
+}
+
+/**
+ * Implements hook_field_formatter_settings_form().
+ */
+function linked_title_field_formatter_settings_form($field, $instance, $view_mode, $form, &$form_state) {
+  $element = title_field_formatter_settings_form($field, $instance, $view_mode, $form, $form_state);
+
+  $element['title_link']['#options'] = linked_title_get_link_types($instance['entity_type'], $instance['bundle']);
+
+  return $element;
+}
+
+/**
+ * Implements hook_field_formatter_settings_summary().
+ */
+function linked_title_field_formatter_settings_summary($field, $instance, $view_mode) {
+  // Get the summary from image module.
+  $summary = title_field_formatter_settings_summary($field, $instance, $view_mode);
+
+  // If link type is other than default ones, it's not included, so we can add it
+  // at the end of summary
+  $settings = $instance['display'][$view_mode]['settings'];
+  if (!empty($settings['title_link']) && !in_array($settings['title_link'], array('content'))) {
+    $field_instance = field_info_instance($instance['entity_type'], $settings['title_link'], $instance['bundle']);
+    $summary .= '<br />Linked using ' .t(
+        '@field_label (@field_name)',
+        array(
+          '@field_label' => $field_instance['label'], // @todo: i18n support?
+          '@field_name' => $field_instance['field_name'],
+        )
+      );
+  }
+
+  return $summary;
+}
+
+/**
+ * Implements hook_field_formatter_view().
+ */
+function linked_title_field_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display) {
+  $settings = $display['settings'];
+  $output = isset($items[0]) ? $items[0]['safe_value'] : '';
+
+  if (!empty($output) && !empty($settings['title_link'])) {
+    if($settings['title_link'] == 'content') {
+      $uri = entity_uri($entity_type, $entity);
+      $output = l($output, $uri['path'], array('html' => TRUE));
+    }
+    elseif (isset($entity->{$settings['title_link']}[$langcode][0]['url'])) {
+      $link_options = $entity->{$settings['title_link']}[$langcode][0];
+      $link_url = $link_options['url']; unset($link_options['url']);
+
+      if (isset($link_options['title'])) {
+        $link_options['attributes']['title'] = $link_options['title'];
+      }
+
+      $output = l($output, $link_url, $link_options);
+    }
+  }
+
+  $wrap_tag = empty($settings['title_style']) ? '_none' : $settings['title_style'];
+
+  if ($wrap_tag != '_none') {
+    $element = array(
+      'element' => array(
+        '#tag' => $wrap_tag,
+        '#value' => $output,
+      ),
+    );
+
+    if (!empty($settings['title_class'])) {
+      $element['#attributes'] = array('class' => $settings['title_class']);
+    }
+
+    $output = theme('html_tag', $element);
+  }
+
+  $element = array(
+    array(
+      '#markup' => $output,
+    ),
+  );
+
+  return $element;
+}
+
+/**
+ * Get link options for a given entity type and bundle
+ *
+ * @param string $entity_type
+ *   Entity type
+ * @param string $bundle
+ *   Entity bundle
+ *
+ * @return array
+ *   List of link types that can be used
+ */
+function linked_title_get_link_types($entity_type, $bundle) {
+  // Default link types
+  $link_types = array(
+    'content' => t('Linked to content'),
+    'file' => t('Linked to file'),
+  );
+
+  $field_instances = field_info_instances($entity_type, $bundle);
+  foreach($field_instances as $field_instance) {
+    $field_info = field_info_field($field_instance['field_name']);
+    if ($field_info['type'] == 'link_field') {
+      $link_types[$field_instance['field_name']] = t(
+        '@field_label (@field_name)',
+        array(
+          '@field_label' => $field_instance['label'], // @todo: i18n support?
+          '@field_name' => $field_instance['field_name'],
+        )
+      );
+    }
+  }
+
+  return $link_types;
+}
