@@ -58,7 +58,10 @@ function linked_title_field_formatter_settings_summary($field, $instance, $view_
  */
 function linked_title_field_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display) {
   $settings = $display['settings'];
-  $output = isset($items[0]) ? $items[0]['safe_value'] : '';
+  //$output = isset($items[0]) ? $items[0]['safe_value'] : '';
+  // We use the value here, the safe_value escapes the aphostrophes.
+  // @see http://jira.amazeelabs.com/browse/VET-284
+  $output = isset($items[0]) ? $items[0]['value'] : '';
 
   if (!empty($output) && !empty($settings['title_link'])) {
     if($settings['title_link'] == 'content') {
