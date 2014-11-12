@@ -24,7 +24,18 @@ function linked_title_field_formatter_info() {
 function linked_title_field_formatter_settings_form($field, $instance, $view_mode, $form, &$form_state) {
   $element = title_field_formatter_settings_form($field, $instance, $view_mode, $form, $form_state);
 
-  $element['title_link']['#options'] = linked_title_get_link_types($instance['entity_type'], $instance['bundle']);
+  // We have a special case when used in panels, the instance will have the
+  // values for entity_type and bundle set to 'ctools'. In this case we can
+  // ignore them and present all the possible link fields as options.
+  $entity_type = NULL;
+  $bundle = NULL;
+  if (!empty($instance['entity_type']) && $instance['entity_type'] != 'ctools') {
+    $entity_type = $instance['entity_type'];
+  }
+  if (!empty($instance['bundle']) && $instance['bundle'] != 'ctools') {
+    $bundle = $instance['bundle'];
+  }
+  $element['title_link']['#options'] = linked_title_get_link_types($entity_type, $bundle);
 
   return $element;
 }
@@ -68,15 +79,27 @@ function linked_title_field_formatter_view($entity_type, $entity, $field, $insta
       $uri = entity_uri($entity_type, $entity);
       $output = l($output, $uri['path'], array('html' => TRUE));
     }
-    elseif (isset($entity->{$settings['title_link']}[$langcode][0]['url'])) {
-      $link_options = $entity->{$settings['title_link']}[$langcode][0];
-      $link_url = $link_options['url']; unset($link_options['url']);
-
-      if (isset($link_options['title'])) {
-        $link_options['attributes']['title'] = $link_options['title'];
+    else {
+      // The setting looks like this now: content_type::bundle::field_name.
+      $words = explode('::', $settings['title_link']);
+      if (count($words) == 3) {
+        $field_name = $words[2];
       }
+      else {
+        // For backward compatibility, we still use the old setting if we could
+        // not split the title_link.
+        $field_name = $settings['title_link'];
+      }
+      if (isset($entity->{$field_name}[$langcode][0]['url'])) {
+        $link_options = $entity->{$field_name}[$langcode][0];
+        $link_url = $link_options['url']; unset($link_options['url']);
 
-      $output = l($output, $link_url, $link_options);
+        if (isset($link_options['title'])) {
+          $link_options['attributes']['title'] = $link_options['title'];
+        }
+
+        $output = l($output, $link_url, $link_options);
+      }
     }
   }
 
@@ -117,23 +140,36 @@ function linked_title_field_formatter_view($entity_type, $entity, $field, $insta
  * @return array
  *   List of link types that can be used
  */
-function linked_title_get_link_types($entity_type, $bundle) {
+function linked_title_get_link_types($entity_type = NULL, $bundle = NULL) {
   // Default link types
   $link_types = array(
     'content' => t('Linked to content'),
   );
 
-  $field_instances = field_info_instances($entity_type, $bundle);
-  foreach($field_instances as $field_instance) {
-    $field_info = field_info_field($field_instance['field_name']);
-    if ($field_info['type'] == 'link_field') {
-      $link_types[$field_instance['field_name']] = t(
-        '@field_label (@field_name)',
-        array(
-          '@field_label' => $field_instance['label'], // @todo: i18n support?
-          '@field_name' => $field_instance['field_name'],
-        )
-      );
+  $field_instances = field_info_instances();
+  foreach($field_instances as $content_type => $bundles) {
+    foreach($bundles as $bundle_name => $bundle_instances) {
+      // If we have to filter for entity types or bundles, we do it now.
+      if (isset($entity_type) && $entity_type != $content_type) {
+        continue;
+      }
+      if (isset($bundle) && $bundle_name != $bundle) {
+        continue;
+      }
+      foreach($bundle_instances as $field_instance) {
+        $field_info = field_info_field($field_instance['field_name']);
+        if ($field_info['type'] == 'link_field') {
+          $link_types[$content_type . '::' . $bundle_name . '::' . $field_instance['field_name']] = t(
+            '@field_label (@field_name) from: @content_type (@bundle)',
+            array(
+              '@field_label' => $field_instance['label'], // @todo: i18n support?
+              '@field_name' => $field_instance['field_name'],
+              '@content_type' => $content_type,
+              '@bundle' => $bundle_name,
+            )
+          );
+        }
+      }
     }
   }
 
