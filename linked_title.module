@@ -90,8 +90,9 @@ function linked_title_field_formatter_view($entity_type, $entity, $field, $insta
         // not split the title_link.
         $field_name = $settings['title_link'];
       }
-      if (isset($entity->{$field_name}[$langcode][0]['url'])) {
-        $link_options = $entity->{$field_name}[$langcode][0];
+      $field_language = field_language($entity_type, $entity, $field_name, $langcode);
+      if (isset($entity->{$field_name}[$field_language][0]['url'])) {
+        $link_options = $entity->{$field_name}[$field_language][0];
         $link_url = $link_options['url']; unset($link_options['url']);
 
         if (isset($link_options['title'])) {
