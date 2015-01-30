@@ -101,6 +101,10 @@ function linked_title_field_formatter_view($entity_type, $entity, $field, $insta
 
         $output = l($output, $link_url, $link_options);
       }
+      else {
+        // When there is no link, wrapp it in a span.
+        $output = '<span class="no-url">' . $output . '</span>';
+      }
     }
   }
 
