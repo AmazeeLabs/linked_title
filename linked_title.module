@@ -13,7 +13,12 @@ function linked_title_field_formatter_info() {
     'linked_title_wrap' => array(
       'label' => t('Linked and wrapped title (link field support)'),
       'field types' => array('text'),
-      'settings' => array('title_style' => '', 'title_link' => '', 'title_class' => ''),
+      'settings' => array(
+        'title_style' => '',
+        'title_link' => '',
+        'title_class' => '',
+        'custom_path' => '',
+      ),
     ),
   );
 }
@@ -22,6 +27,7 @@ function linked_title_field_formatter_info() {
  * Implements hook_field_formatter_settings_form().
  */
 function linked_title_field_formatter_settings_form($field, $instance, $view_mode, $form, &$form_state) {
+  $settings = $instance['display'][$view_mode]['settings'];
   $element = title_field_formatter_settings_form($field, $instance, $view_mode, $form, $form_state);
 
   // We have a special case when used in panels, the instance will have the
@@ -36,6 +42,20 @@ function linked_title_field_formatter_settings_form($field, $instance, $view_mod
     $bundle = $instance['bundle'];
   }
   $element['title_link']['#options'] = linked_title_get_link_types($entity_type, $bundle);
+
+  // Add option to link to custom path.
+  $element['title_link']['#options']['custom_path'] = t('Custom path');
+  $element['custom_path'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Custom path'),
+    '#description' => t('Internal drupal path or external URL.'),
+    '#default_value' => isset($settings['custom_path']) ? $settings['custom_path'] : '',
+    '#states' => array(
+      'visible' => array(
+        ':input[name="title_link"]' => array('value' => 'custom_path'),
+      ),
+    ),
+  );
 
   return $element;
 }
@@ -78,6 +98,9 @@ function linked_title_field_formatter_view($entity_type, $entity, $field, $insta
     if($settings['title_link'] == 'content') {
       $uri = entity_uri($entity_type, $entity);
       $output = l($output, $uri['path'], array('html' => TRUE));
+    }
+    elseif ($settings['title_link'] == 'custom_path') {
+      $output = l($output, $settings['custom_path'], array('html' => TRUE));
     }
     else {
       // The setting looks like this now: content_type::bundle::field_name.
